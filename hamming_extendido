@@ -91,10 +91,10 @@ def comparar_palabras(original: str, corregida: str):
 # Ejemplo de uso
 # -------------------------
 if __name__ == "__main__":
-    # palabra_original_12bits es la que recibiste (por ejemplo con un error introducido)
-    palabra_original_12bits = "110100110011"  # ejemplo: reemplaza por la tuya
+    # palabra_original_12bits es la que que se recibe (por ejemplo con un error introducido)
+    palabra_original_12bits = "110100110011"  # ejemplo: reemplaza por otra
 
-    # Usamos la función que corrige y devuelve la palabra corregida completa
+    # utilizando la función que corrige y devuelve la palabra corregida completa
     datos, palabra_corregida, posicion = decodificar_y_corregir_hamming_full(palabra_original_12bits)
 
     print("Palabra original : ", palabra_original_12bits)
