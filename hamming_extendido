@@ -1,38 +1,57 @@
+# -*- coding: utf-8 -*-
+def xor_list(bit_list):
+    """
+    XOR acumulativo de una lista/iterable de bits (0/1).
+    Devuelve 0 o 1.
+    """
+    resultado = 0
+    for bit in bit_list:
+        resultado ^= int(bit)
+    return resultado
+
+
 def decodificar_y_corregir_hamming_full(palabra_recibida: str):
     """
-    Verifica una palabra de código de 12 bits, corrige un error de un solo bit,
+    Verifica una palabra de código de 12 bits (Hamming 12,8),
+    corrige un error de un solo bit (si la posición está en 1..12),
     extrae los 8 bits de datos originales y devuelve:
       (datos_corregidos_str, palabra_corregida_12bits_str, posicion_error)
-    Igual que tu función, pero devuelve la palabra corregida completa para poder comparar.
+    Si el síndrome indica una posición fuera de 1..12, no corrige y avisa.
     """
     if len(palabra_recibida) != 12:
         raise ValueError("Se requieren 12 bits de palabra de código.")
 
-    # Convertir a lista de enteros e añadir 0 inicial (índice 1-12)
+    # Convertir a lista de enteros e añadir elemento 0 al inicio para usar índices 1..12
     palabra = [0] + [int(b) for b in palabra_recibida]
 
-    # Calculando los bits de chequeo para formar el sindrome
+    # Calcular bits de chequeo (síndrome) usando XOR sobre las posiciones indicadas
     c1 = xor_list([palabra[i] for i in [1, 3, 5, 7, 9, 11]])
     c2 = xor_list([palabra[i] for i in [2, 3, 6, 7, 10, 11]])
     c4 = xor_list([palabra[i] for i in [4, 5, 6, 7, 12]])
     c8 = xor_list([palabra[i] for i in [8, 9, 10, 11, 12]])
 
-    # nota: formamos el síndrome en orden c8 c4 c2 c1 para obtener la posición en binario MSB->LSB
-    sindrome_binario = str(c8) + str(c4) + str(c2) + str(c1)
+    # Síndrome en orden MSB->LSB: c8 c4 c2 c1
+    sindrome_binario = f"{c8}{c4}{c2}{c1}"
     posicion_error = int(sindrome_binario, 2)
 
-    # Corrigiendo error existente (si hay)
-    if posicion_error != 0:
-        # invertir el bit erroneo
+    # Manejo del síndrome
+    if posicion_error == 0:
+        print("  [ESTADO]: No se detectaron errores de un solo bit.")
+    elif 1 <= posicion_error <= 12:
+        print(f"  [ERROR DETECTADO]: Síndrome {sindrome_binario} -> posición {posicion_error}.")
+        # invertir el bit erróneo
         palabra[posicion_error] = 1 - palabra[posicion_error]
-        # palabra ahora contiene el código corregido (en índices 1..12)
-    # sino, palabra ya es la original
+        print(f"  [CORRECCIÓN]: Bit en posición {posicion_error} invertido.")
+    else:
+        # posición fuera del rango 1..12 => posible doble error o palabra inválida
+        print(f"  [AVISO]: Síndrome {sindrome_binario} indica posición {posicion_error} fuera de 1..12.")
+        print("  Esto puede indicar un error de más de 1 bit o una palabra corrupta; no se corrige.")
 
-    # recopilando el mensaje original, de D1 a D8 (posiciones fijas)
+    # Extraer los bits de datos en el orden D1..D8 (posiciones 3,5,6,7,9,10,11,12)
     posiciones_datos = [3, 5, 6, 7, 9, 10, 11, 12]
     datos_corregidos = "".join(str(palabra[i]) for i in posiciones_datos)
 
-    # construir palabra corregida como string de 12 bits (índices 1..12)
+    # Reconstruir la palabra corregida completa (índices 1..12)
     palabra_corregida = "".join(str(palabra[i]) for i in range(1, 13))
 
     return datos_corregidos, palabra_corregida, posicion_error
@@ -41,38 +60,34 @@ def decodificar_y_corregir_hamming_full(palabra_recibida: str):
 def comparar_palabras(original: str, corregida: str):
     """
     Compara dos palabras de 12 bits (original vs corregida) y devuelve una lista con
-    las diferencias encontradas. Cada elemento de la lista es un diccionario:
+    las diferencias encontradas. Cada elemento es un dict:
       {
-        'pos_global': int,        # posición 1..12
+        'pos_global': int,        # 1..12
         'bit_original': '0'/'1',
         'bit_corregido': '0'/'1',
         'tipo': 'paridad'|'dato',
-        'dato_indice': None|1..8  # si es un bit de dato, indica cual (D1..D8)
+        'dato_indice': None|1..8
       }
-    Si las longitudes difieren, se hace padding con '0' a la más corta (aunque para Hamming(12,8)
-    ambas deberían tener 12 bits).
     """
-    # Asegurar longitud
+    # Ajustar longitud si es necesario (padding con '0' por seguridad)
     maxlen = max(len(original), len(corregida))
     orig = original.ljust(maxlen, '0')
     corr = corregida.ljust(maxlen, '0')
 
-    # definición de posiciones de paridad y de datos (para Hamming 12,8)
     posiciones_paridad = {1, 2, 4, 8}
-    posiciones_datos = [3, 5, 6, 7, 9, 10, 11, 12]  # mapeo a D1..D8 (en ese orden)
+    posiciones_datos = [3, 5, 6, 7, 9, 10, 11, 12]  # mapeo a D1..D8
 
     diffs = []
     for i in range(maxlen):
         bo = orig[i]
         bc = corr[i]
         if bo != bc:
-            pos = i + 1  # 1-index
+            pos = i + 1
             if pos in posiciones_paridad:
                 tipo = 'paridad'
                 dato_idx = None
             else:
                 tipo = 'dato'
-                # obtener índice del dato (1..8) si aplica
                 try:
                     dato_idx = posiciones_datos.index(pos) + 1
                 except ValueError:
@@ -91,27 +106,33 @@ def comparar_palabras(original: str, corregida: str):
 # Ejemplo de uso
 # -------------------------
 if __name__ == "__main__":
-    # palabra_original_12bits es la que que se recibe (por ejemplo con un error introducido)
-    palabra_original_12bits = "110100110011"  # ejemplo: reemplaza por otra
+    # Ejemplo: palabra original (sin error)
+    palabra_sin_error = "010011001101"  # 12 bits de ejemplo
+    # Introducimos manualmente un error para probar: flip en pos 6 (1-index)
+    lista = list(palabra_sin_error)
+    pos_error = 6 - 1  # 0-index
+    lista[pos_error] = '1' if lista[pos_error] == '0' else '0'
+    palabra_con_error = "".join(lista)
 
-    # utilizando la función que corrige y devuelve la palabra corregida completa
-    datos, palabra_corregida, posicion = decodificar_y_corregir_hamming_full(palabra_original_12bits)
-
-    print("Palabra original : ", palabra_original_12bits)
-    print("Palabra corregida: ", palabra_corregida)
-    print("Datos recuperados : ", datos)
-    if posicion != 0:
-        print(f"Se corrigió la posición {posicion} (1-index).")
+    print("Palabra con posible error : ", palabra_con_error)
+    datos, palabra_corregida, posicion = decodificar_y_corregir_hamming_full(palabra_con_error)
+    print("Palabra corregida          : ", palabra_corregida)
+    print("Datos recuperados (8 bits): ", datos)
+    if 1 <= posicion <= 12:
+        print(f"Posición corregida: {posicion}")
+    elif posicion == 0:
+        print("No hubo corrección (sin errores detectados).")
     else:
-        print("No se detectó ningún error de un solo bit.")
+        print("Síndrome fuera de rango; no se corrigió (posible doble error).")
 
-    # Comparar y mostrar todas las diferencias entre original y corregida
-    diferencias = comparar_palabras(palabra_original_12bits, palabra_corregida)
-    if diferencias:
-        print("\nDiferencias encontradas (pos_global, tipo, dato_idx, orig->corr):")
-        for d in diferencias:
-            print(f" - Pos {d['pos_global']:2d}: {d['tipo']:7s} "
-                  f"{('D'+str(d['dato_indice'])) if d['dato_indice'] else '':6s}"
-                  f" {d['bit_original']} -> {d['bit_corregido']}")
+    # Comparar original (con error) vs corregida para ver qué cambió
+    diffs = comparar_palabras(palabra_con_error, palabra_corregida)
+    if diffs:
+        print("\nDiferencias encontradas:")
+        for d in diffs:
+            tipo = d['tipo']
+            di = f"D{d['dato_indice']}" if d['dato_indice'] else ""
+            print(f" - Pos {d['pos_global']:2d}: {tipo:7s} {di:4s} {d['bit_original']} -> {d['bit_corregido']}")
     else:
-        print("\nNo hay diferencias entre la palabra original y la corregida.")
+        print("\nNo se detectaron diferencias entre original y corregida.")
+
